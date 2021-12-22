@@ -31,7 +31,27 @@ object Day6 extends App {
 
     fish.length
   }
-  
+
+  def part2(): Long = {
+
+    var ages = Array.ofDim[Long](9).toBuffer
+
+    // Convert input to sequence of ages
+    input.foreach(x => ages(x) = ages(x) + 1)
+
+    // println(ages.mkString("|"))
+    (1 to 256).foreach { x =>
+      val head = ages.head
+      ages = ages.tail
+      ages(6) += head
+      ages += head
+      // println(ages.mkString("|"))
+    }
+
+    ages.sum
+  }
+
 
   println(part1())
+  println(part2())
 }
