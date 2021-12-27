@@ -125,7 +125,7 @@ object Day12 extends App {
     paths.map(_.mkString(",")).foreach(println)
     paths.length
   }
-  
+
   println(part1())
   println(part2())
 }
