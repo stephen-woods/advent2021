@@ -1,3 +1,4 @@
+import scala.annotation.tailrec
 import scala.io.Source
 
 object Day13 extends App {
@@ -104,13 +105,18 @@ object Day13 extends App {
   }
 
   def part2(): Unit = {
+    @tailrec
+    def rec(data: Data) : Data = {
+      data.foldAlongs match {
+        case Nil => data
+        case _ => rec(data.foldAlong())
+      }
+    }
     val data = parse(in)
-
-    val end = data.foldAlongs.foldLeft(data){ case (acc, fa) => acc.foldAlong()}
+    val end = rec(data)
     end.render()
   }
 
   println(part1())
-  
   part2()
 }
