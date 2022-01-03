@@ -3,8 +3,6 @@ import scala.collection.mutable
 import scala.io.Source
 
 case object Day15 extends App {
-
-
   val source = Source.fromFile("day15input.txt")
   val input = source.getLines().toList
   source.close()
@@ -35,20 +33,13 @@ case object Day15 extends App {
 
   case class Pos(x: Int, y: Int)
 
-  case class Node(pos: Pos, risk: Int)
-
   val grid = parse(in)
 
-  grid.map(_.mkString).foreach(println)
 
-  val maxY = grid.length - 1
-  val maxX = grid.head.length - 1
-  val start = Pos(0, 0)
-  val end = Pos(maxX, maxY)
-
-
-  def avail(explored: mutable.Set[Pos], p: Pos): List[Pos] = {
-
+  def avail(explored: mutable.Set[Pos],
+            p: Pos,
+            maxX: Int,
+            maxY: Int): List[Pos] = {
     val left = p.copy(x = p.x - 1)
     val up = p.copy(y = p.y - 1)
     val right = p.copy(x = p.x + 1)
@@ -60,7 +51,9 @@ case object Day15 extends App {
       .filterNot(explored.contains)
   }
 
-  def riskPath(froms: Array[Array[Pos]]): List[Pos] = {
+  def riskPath(froms: Array[Array[Pos]],
+               start: Pos,
+               end: Pos): List[Pos] = {
     @tailrec
     def rec(acc: List[Pos], p: Pos): List[Pos] = {
       if (p == start) start :: acc
@@ -69,54 +62,120 @@ case object Day15 extends App {
         rec(p :: acc, f)
       }
     }
-
-    rec(Nil, end).reverse
+    rec(Nil, end)
   }
 
+  def bigGrid(risks: Array[Array[Int]]): Array[Array[Int]] = {
+    val dimY = risks.length
+    val dimX = risks.head.length
 
-  def part1(): Int = {
-    val totalRisks = grid.map(_.map(_ => Int.MaxValue))
+    val ret = Array.ofDim[Int](dimY * 5, dimX * 5)
+    for {
+      y <- risks.indices
+      x <- risks(y).indices
+      yy <- 0 to 4
+      xx <- 0 to 4
+    } {
+      val r1 = risks(y)(x) + yy + xx
+      val r2 = if (r1 > 9) r1 - 9 else r1
+      ret(y + (yy * dimY))(x + (xx * dimX)) = r2
+    }
+    ret
+  }
+
+  /**
+   * Variant of Dijkstra's algorithm to find path of least risk
+   * @param risks risk based on position
+   * @param start starting position
+   *
+   * @return totalRisks (mutable grid of least accumulated risk from start) and froms (mutable grid of positions
+   *         indicating last least risk path)
+   */
+  def dijkstra(risks: Array[Array[Int]],
+               start: Pos): (Array[Array[Int]], Array[Array[Pos]]) = {
+    val maxY = risks.length - 1
+    val maxX = risks.head.length - 1
+
+    val totalRisks = risks.map(_.map(_ => Int.MaxValue))
     totalRisks(start.y)(start.x) = 0
 
-    val from = grid.map(_.map(_ => Pos(Int.MaxValue, Int.MaxValue)))
-    from(start.y)(start.x) = start
+    val froms = risks.map(_.map(_ => Pos(Int.MaxValue, Int.MaxValue)))
+    froms(start.y)(start.x) = start
 
-    val explored = mutable.Set.empty[Pos]
-    val enqueued = mutable.Set.empty[Pos]
-
+    // Priority queue of encountered, yet not fully explored positions ordered by least risk
     val pq = mutable.PriorityQueue[Pos]()(Ordering.by(p => -totalRisks(p.y)(p.x)))
     pq.enqueue(start)
+
+    // Positions we have already explored, as indicated when positions are dequeued from the priority queue
+    val explored = mutable.Set.empty[Pos]
+
+    // Positions that have already been enqueued in the priority queue (so we don't have duplicates). Positions are
+    // enqueued as we encounter them
+    val enqueued = mutable.Set.empty[Pos]
+
+    // Start off by enqueueing the start position
     enqueued.add(start)
 
     while (pq.nonEmpty) {
       val p = pq.dequeue()
       explored.add(p)
 
-      val nexts = avail(explored, p)
+      // Find all available adjacent positions, excluding those we have already explored
+      avail(explored, p, maxX, maxY)
+        .tapEach { pn =>
+          val r = totalRisks(pn.y)(pn.x)
+          val r1 = totalRisks(p.y)(p.x) + risks(pn.y)(pn.x)
 
-      nexts.foreach { pn =>
-        val r = totalRisks(pn.y)(pn.x)
-        val r1 = totalRisks(p.y)(p.x) + grid(pn.y)(pn.x)
-
-        if (r1 < r) {
-          totalRisks(pn.y)(pn.x) = r1
-          from(pn.y)(pn.x) = p
+          if (r1 < r) {
+            totalRisks(pn.y)(pn.x) = r1
+            froms(pn.y)(pn.x) = p
+          }
         }
-      }
-
-      nexts
         .filterNot(enqueued.contains)
-        .foreach{pn =>
+        .foreach { pn =>
           pq.enqueue(pn)
           enqueued.add(pn)
         }
     }
+    (totalRisks, froms)
+  }
 
-    val risk = totalRisks(end.y)(end.y)
-//    val path = riskPath(from)
+
+  def part1(): Int = {
+    val risks = grid
+//    risks.map(_.mkString).foreach(println)
+
+    val maxY = risks.length - 1
+    val maxX = risks.head.length - 1
+    val start = Pos(0, 0)
+    val end = Pos(maxX, maxY)
+
+    val (totalRisks, froms) = dijkstra(risks, start)
+
+    val endRisk = totalRisks(end.y)(end.y)
+//    val path = riskPath(froms, start, end)
 //    path.foreach(println)
-    risk
+    endRisk
+  }
+
+  def part2(): Int = {
+    val risks = bigGrid(grid)
+//    risks.map(_.mkString).foreach(println)
+
+    val maxY = risks.length - 1
+    val maxX = risks.head.length - 1
+    val start = Pos(0, 0)
+    val end = Pos(maxX, maxY)
+
+
+    val (totalRisks, froms) = dijkstra(risks, start)
+
+    val endRisk = totalRisks(end.y)(end.y)
+//    val path = riskPath(froms, start, end)
+//    path.foreach(println)
+    endRisk
   }
 
   println(part1())
+  println(part2())
 }
