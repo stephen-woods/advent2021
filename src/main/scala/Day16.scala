@@ -23,12 +23,14 @@ object Day16 extends App {
     def typeId: Int
   }
 
+  case class ResultTail[A](tail: List[Boolean], value: A)
+
   case class LiteralPacket(version: Int,
                            value: Int) extends Packet {
     val typeId = 4
   }
 
-  case class OperatorPacket(version, Int,
+  case class OperatorPacket(version: Int,
                             typeId: Int,
                             lengthTypeId: Int,
                             packets: List[Packet])
@@ -52,30 +54,26 @@ object Day16 extends App {
     ret
   }
 
-  def bolts2Value(bs: List[Boolean]): Int = {
+  def bolts2Value(bs: List[Boolean]): ResultTail[Int] = {
     val zero = List.empty[Boolean]
 
     @tailrec
     def rec(rbs: List[Boolean],
-            acc : List[Boolean]): List[Boolean] = {
+            acc : List[Boolean]): ResultTail[List[Boolean]] = {
       rbs match {
         case true :: tail =>
-          val take = tail.take(4)
-          val drop = tail.drop(4)
+          val (take, drop) = tail.splitAt(4)
           rec(drop, acc ::: take)
 
         case false :: tail =>
-          val take = tail.take(4)
-          acc ::: take
+          val (take, drop) = tail.splitAt(4)
+          ResultTail(drop, acc ::: take)
       }
     }
-    val total = rec(bs, zero)
-    println(render(total))
-    bolts2Int(total)
+    val r = rec(bs, zero)
+    println(render(r.value))
+    r.copy(value = bolts2Int(r.value))
   }
-
-
-
 
   val bolts = in.flatMap(char2bolts)
 
@@ -97,14 +95,14 @@ object Day16 extends App {
     bs = bs.drop(3)
 
     if (typeId == 4) {
-      val value = bolts2Value(bs)
-      LiteralPacket(version, value)
+      val r = bolts2Value(bs)
+      LiteralPacket(version, r.value)
     } else {
       val lengthTypeId = bolts2Int(bs.take(1))
       bs = bs.drop(1)
 
 
-
+         ???
     }
   }
   println(part1())
