@@ -54,7 +54,7 @@ object Day16 extends App {
   case class ResultTail[A](tail: List[Boolean], value: A)
 
   case class LiteralPacket(version: Int,
-                           value: Int) extends Packet {
+                           value: Long) extends Packet {
     val typeId = 4
   }
 
@@ -79,23 +79,23 @@ object Day16 extends App {
   }
 
   /**
-   * Returns the Integer corresponding to the the provided list of Booleans representing
+   * Returns the Long corresponding to the the provided list of Booleans representing
    * a binary number.
    *
    * @param bs List of Booleans representing bits
    */
-  def bolts2Int(bs: List[Boolean]): Int= {
-    val zero = (0, 0)
+  def bolts2Long(bs: List[Boolean]): Long= {
+    val zero = (0L, 0L)
     val (_, ret) = bs.foldRight(zero) {
       case (x, (shift, acc)) =>
-        val ta = if (x) 1 << shift else 0
+        val ta = if (x) 1L << shift else 0
         (shift + 1, ta + acc)
     }
     ret
   }
 
   /**
-   * Returns a literal packet value based on the list of Booleans representing a binary data, and
+   * Returns a literal packet value based on the list of Booleans representing binary data, and
    * any remaining unused bits. Literal value packets encode a single binary number. To do this,
    * the binary number is padded with leading zeroes until its length is a multiple of four bits,
    * and then it is broken into groups of four bits. Each group is prefixed by a 1 bit except the
@@ -103,7 +103,7 @@ object Day16 extends App {
    *
    * @param bs List of Booleans representing bits
    */
-  def bolts2Value(bs: List[Boolean]): ResultTail[Int] = {
+  def bolts2Value(bs: List[Boolean]): ResultTail[Long] = {
     val zero = List.empty[Boolean]
 
     @tailrec
@@ -121,12 +121,14 @@ object Day16 extends App {
     }
 
     val r = rec(bs, zero)
-    r.copy(value = bolts2Int(r.value))
+    r.copy(value = bolts2Long(r.value))
   }
 
-
-
-
+  /**
+   * Parses a list of Booleans representing binary data into a Packet, and any remaining unused bits.
+   *
+   * @param bits List of Booleans representing bits
+   */
   def parse(bits: List[Boolean]): ResultTail[Packet] = {
 
     @tailrec
@@ -154,11 +156,11 @@ object Day16 extends App {
 
     // Every packet begins with a standard header: the first three bits encode the packet version
     val (versionBits, versionTail) = bits.splitAt(3)
-    val version = bolts2Int(versionBits)
+    val version = bolts2Long(versionBits).toInt
 
     // The next three bits encode the packet type ID
     val (typeIdBits, typeIdTail) = versionTail.splitAt(3)
-    val typeId = bolts2Int(typeIdBits)
+    val typeId = bolts2Long(typeIdBits).toInt
 
     if (typeId == 4) {
       // Packets with type ID 4 represent a literal value. Literal value packets encode a single
@@ -169,12 +171,12 @@ object Day16 extends App {
       // Every other type of packet (any packet with a type ID other than 4) represent an operator
       // that performs some calculation on one or more sub-packets contained within.
       val (lengthTypeIdBits, lengthTypeIdTail) = typeIdTail.splitAt(1)
-      val lengthTypeId = bolts2Int(lengthTypeIdBits)
+      val lengthTypeId = bolts2Long(lengthTypeIdBits).toInt
       if (lengthTypeId == 0) {
         // If the length type ID is 0, then the next 15 bits are a number that represents
         // the total length in bits of the sub-packets contained by this packet.
         val (subLengthBits, subLengthTail) = lengthTypeIdTail.splitAt(15)
-        val subLength = bolts2Int(subLengthBits)
+        val subLength = bolts2Long(subLengthBits).toInt
         val (subBits, subBitTail) = subLengthTail.splitAt(subLength)
         val packets = parse0(subBits, Nil)
         ResultTail(subBitTail, OperatorPacket(version, typeId, lengthTypeId, packets))
@@ -183,15 +185,23 @@ object Day16 extends App {
         // If the length type ID is 1, then the next 11 bits are a number that represents
         // the number of sub-packets immediately contained by this packet
         val (subLengthBits, subLengthTail) = lengthTypeIdTail.splitAt(11)
-        val subLength = bolts2Int(subLengthBits)
-        val r =parse1(subLengthTail, Nil, subLength)
+        val subLength = bolts2Long(subLengthBits).toInt
+        val r = parse1(subLengthTail, Nil, subLength)
         val packets = r.value
         ResultTail(r.tail, OperatorPacket(version, typeId, lengthTypeId, packets))
       }
     }
   }
 
-  def calc(packet: Packet): Int = {
+
+  /**
+   * Returns the calculated result for the given packet. Literal packets will simply return their number,
+   * where as operator packets will perform necessary operations on contained sub-packets (sum, product,
+   * min, max, greater than, less than, equal to)
+   *
+   * @param packet packet to calculate
+   */
+  def calc(packet: Packet): Long = {
     packet match {
       // Literal values (type ID 4) represent a single number
       case LiteralPacket(_, value) => value
@@ -239,8 +249,8 @@ object Day16 extends App {
   }
 
 
-  def part1(): Int = {
-    def sumVersions(packet: Packet): Int = {
+  def part1(): Long = {
+    def sumVersions(packet: Packet): Long = {
       packet match {
         case LiteralPacket(version, _) => version
         case OperatorPacket(version, _, _, packets) =>
@@ -248,19 +258,15 @@ object Day16 extends App {
       }
     }
 
-    println(render(bolts))
     val packet = parse(bolts).value
-
     sumVersions(packet)
   }
 
-  def part2(): Int = {
+  def part2(): Long = {
     val packet = parse(bolts).value
-    println(packet)
     calc(packet)
   }
-
+  
   println(part1())
   println(part2())
-  // Not 723516924 too low
 }
