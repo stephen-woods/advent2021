@@ -3,7 +3,7 @@ import scala.io.Source
 
 object Day16 extends App {
   val source = Source.fromFile("day16input.txt")
-  val input = source.getLines().map(_.toList).toList
+  val input = source.getLines().flatMap(_.toList).toList
   source.close()
 
   // Literal Packet
@@ -15,7 +15,15 @@ object Day16 extends App {
   // Operator length type 1
   val input4 = "EE00D40C823060".toList
 
-  val in = input3
+  val input5 = "8A004A801A8002F478".toList
+
+  val input6 = "620080001611562C8802118E34".toList
+
+  val input7 = "C0015000016115A2E0802F182340".toList
+
+  val input8 = "A0016C880162017C3686B18A3D4780".toList
+
+  val in = input
 
   sealed trait Packet {
     def version: Int
@@ -33,7 +41,7 @@ object Day16 extends App {
   case class OperatorPacket(version: Int,
                             typeId: Int,
                             lengthTypeId: Int,
-                            packets: List[Packet])
+                            packets: List[Packet]) extends Packet
 
   /**
    * Returns a list of Booleans representing four bits of binary data determined by
@@ -93,13 +101,36 @@ object Day16 extends App {
     }
 
     val r = rec(bs, zero)
-    println(render(r.value))
     r.copy(value = bolts2Int(r.value))
   }
 
 
+
+
   def parse(bits: List[Boolean]): ResultTail[Packet] = {
-    println(render(bits))
+
+    @tailrec
+    def parse0(bs: List[Boolean],
+               acc : List[Packet]): List[Packet] = {
+      bs match {
+        case Nil => acc.reverse
+        case _ =>
+          val r = parse(bs)
+          parse0(r.tail, r.value :: acc)
+      }
+    }
+
+    @tailrec
+    def parse1(bs: List[Boolean],
+               acc : List[Packet],
+               count: Int): ResultTail[List[Packet]] = {
+      if (count == 0)
+        ResultTail(bs, acc.reverse)
+      else {
+        val r = parse(bs)
+        parse1(r.tail, r.value :: acc, count - 1)
+      }
+    }
 
     // Every packet begins with a standard header: the first three bits encode the packet version
     val (versionBits, versionTail) = bits.splitAt(3)
@@ -120,22 +151,22 @@ object Day16 extends App {
       val (lengthTypeIdBits, lengthTypeIdTail) = typeIdTail.splitAt(1)
       val lengthTypeId = bolts2Int(lengthTypeIdBits)
       if (lengthTypeId == 0) {
-         // If the length type ID is 0, then the next 15 bits are a number that represents
-         // the total length in bits of the sub-packets contained by this packet.
-         val (subLengthBits, subLengthTail) = lengthTypeIdTail.splitAt(15)
-         val subLength = bolts2Int(subLengthBits)
-         val (subBits, subBitTail) = subLengthTail.splitAt(subLength)
-
-        // FIXME
-         val r = parse(subBits)
-        ResultTail(r.tail ::: subBitTail, r.value)
+        // If the length type ID is 0, then the next 15 bits are a number that represents
+        // the total length in bits of the sub-packets contained by this packet.
+        val (subLengthBits, subLengthTail) = lengthTypeIdTail.splitAt(15)
+        val subLength = bolts2Int(subLengthBits)
+        val (subBits, subBitTail) = subLengthTail.splitAt(subLength)
+        val packets = parse0(subBits, Nil)
+        ResultTail(subBitTail, OperatorPacket(version, typeId, lengthTypeId, packets))
 
       } else {
         // If the length type ID is 1, then the next 11 bits are a number that represents
         // the number of sub-packets immediately contained by this packet
         val (subLengthBits, subLengthTail) = lengthTypeIdTail.splitAt(11)
         val subLength = bolts2Int(subLengthBits)
-        ???
+        val r =parse1(subLengthTail, Nil, subLength)
+        val packets = r.value
+        ResultTail(r.tail, OperatorPacket(version, typeId, lengthTypeId, packets))
       }
     }
   }
@@ -148,10 +179,21 @@ object Day16 extends App {
   }
 
 
-  def part1(): Packet = {
+
+
+  def part1(): Int = {
+    def sumVersions(packet: Packet): Int = {
+      packet match {
+        case LiteralPacket(version, _) => version
+        case OperatorPacket(version, _, _, packets) =>
+          packets.map(sumVersions).sum + version
+      }
+    }
 
     println(render(bolts))
-    parse(bolts).value
+    val packet = parse(bolts).value
+
+    sumVersions(packet)
   }
 
   println(part1())
