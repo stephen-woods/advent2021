@@ -15,14 +15,34 @@ object Day16 extends App {
   // Operator length type 1
   val input4 = "EE00D40C823060".toList
 
+  // Example for part1
   val input5 = "8A004A801A8002F478".toList
 
+  // Example for part1
   val input6 = "620080001611562C8802118E34".toList
 
+  // Example for part1
   val input7 = "C0015000016115A2E0802F182340".toList
 
+  // Example for part1
   val input8 = "A0016C880162017C3686B18A3D4780".toList
 
+  // Example for part2
+  val input9 = "C200B40A82".toList
+
+  val input10 = "04005AC33890".toList
+
+  val input11 = "880086C3E88112".toList
+
+  val input12 = "CE00C43D881120".toList
+
+  val input13 = "D8005AC2A8F0".toList
+
+  val input14 = "F600BC2D8F".toList
+
+  val input15 = "9C005AC2F8F0".toList
+
+  val input16 = "9C0141080250320F1802104A08".toList
   val in = input
 
   sealed trait Packet {
@@ -64,7 +84,7 @@ object Day16 extends App {
    *
    * @param bs List of Booleans representing bits
    */
-  def bolts2Int(bs: List[Boolean]) = {
+  def bolts2Int(bs: List[Boolean]): Int= {
     val zero = (0, 0)
     val (_, ret) = bs.foldRight(zero) {
       case (x, (shift, acc)) =>
@@ -171,14 +191,52 @@ object Day16 extends App {
     }
   }
 
+  def calc(packet: Packet): Int = {
+    packet match {
+      // Literal values (type ID 4) represent a single number
+      case LiteralPacket(_, value) => value
+
+      // Packets with type ID 0 are sum packets
+      case OperatorPacket(_, 0, _, packets) => packets.map(calc).sum
+
+      // Packets with type ID 1 are product packets
+      case OperatorPacket(_, 1, _, packets) => packets.map(calc).product
+
+      // Packets with type ID 2 are minimum packets
+      case OperatorPacket(_, 2, _, packets) => packets.map(calc).min
+
+      // Packets with type ID 3 are minimum packets
+      case OperatorPacket(_, 3, _, packets) => packets.map(calc).max
+
+      // Packets with type ID 5 are greater than packets - their value is 1 if the value of the
+      // first sub-packet is greater than the value of the second sub-packet; otherwise, their
+      // value is 0
+      case OperatorPacket(_, 5, _, packets) =>
+        val x :: y :: Nil = packets.map(calc)
+        if (x > y) 1 else 0
+
+      // Packets with type ID 6 are less than packets - their value is 1 if the value of the
+      // first sub-packet is less than the value of the second sub-packet; otherwise, their
+      // value is 0.
+      case OperatorPacket(_, 6, _, packets) =>
+        val x :: y :: Nil = packets.map(calc)
+        if (x < y) 1 else 0
+
+      // Packets with type ID 7 are equal to packets - their value is 1 if the value of the
+      // first sub-packet is equal to the value of the second sub-packet; otherwise, their
+      // value is 0.
+      case OperatorPacket(_, 7, _, packets) =>
+        val x :: y :: Nil = packets.map(calc)
+        if (x == y) 1 else 0
+    }
+  }
+
   val bolts = in.flatMap(char2bolts)
 
 
   def render(bs: List[Boolean]): String = {
     bs.map { x => if (x) "1" else "0" }.mkString
   }
-
-
 
 
   def part1(): Int = {
@@ -196,5 +254,13 @@ object Day16 extends App {
     sumVersions(packet)
   }
 
+  def part2(): Int = {
+    val packet = parse(bolts).value
+    println(packet)
+    calc(packet)
+  }
+
   println(part1())
+  println(part2())
+  // Not 723516924 too low
 }
