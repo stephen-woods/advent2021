@@ -15,7 +15,7 @@ object Day16 extends App {
   // Operator length type 1
   val input4 = "EE00D40C823060".toList
 
-  val in = input2
+  val in = input3
 
   sealed trait Packet {
     def version: Int
@@ -35,6 +35,12 @@ object Day16 extends App {
                             lengthTypeId: Int,
                             packets: List[Packet])
 
+  /**
+   * Returns a list of Booleans representing four bits of binary data determined by
+   * the provided hexadecimal character representation.
+   *
+   * @param c hexadecimal character
+   */
   def char2bolts(c: Char): List[Boolean] = {
     val n = Character.digit(c, 16)
     val b1 = (n & 8) > 0
@@ -44,6 +50,12 @@ object Day16 extends App {
     b1 :: b2 :: b3 :: b4 :: Nil
   }
 
+  /**
+   * Returns the Integer corresponding to the the provided list of Booleans representing
+   * a binary number.
+   *
+   * @param bs List of Booleans representing bits
+   */
   def bolts2Int(bs: List[Boolean]) = {
     val zero = (0, 0)
     val (_, ret) = bs.foldRight(zero) {
@@ -54,12 +66,21 @@ object Day16 extends App {
     ret
   }
 
+  /**
+   * Returns a literal packet value based on the list of Booleans representing a binary data, and
+   * any remaining unused bits. Literal value packets encode a single binary number. To do this,
+   * the binary number is padded with leading zeroes until its length is a multiple of four bits,
+   * and then it is broken into groups of four bits. Each group is prefixed by a 1 bit except the
+   * last group, which is prefixed by a 0 bit.
+   *
+   * @param bs List of Booleans representing bits
+   */
   def bolts2Value(bs: List[Boolean]): ResultTail[Int] = {
     val zero = List.empty[Boolean]
 
     @tailrec
     def rec(rbs: List[Boolean],
-            acc : List[Boolean]): ResultTail[List[Boolean]] = {
+            acc: List[Boolean]): ResultTail[List[Boolean]] = {
       rbs match {
         case true :: tail =>
           val (take, drop) = tail.splitAt(4)
@@ -70,9 +91,53 @@ object Day16 extends App {
           ResultTail(drop, acc ::: take)
       }
     }
+
     val r = rec(bs, zero)
     println(render(r.value))
     r.copy(value = bolts2Int(r.value))
+  }
+
+
+  def parse(bits: List[Boolean]): ResultTail[Packet] = {
+    println(render(bits))
+
+    // Every packet begins with a standard header: the first three bits encode the packet version
+    val (versionBits, versionTail) = bits.splitAt(3)
+    val version = bolts2Int(versionBits)
+
+    // The next three bits encode the packet type ID
+    val (typeIdBits, typeIdTail) = versionTail.splitAt(3)
+    val typeId = bolts2Int(typeIdBits)
+
+    if (typeId == 4) {
+      // Packets with type ID 4 represent a literal value. Literal value packets encode a single
+      // binary number.
+      val r = bolts2Value(typeIdTail)
+      ResultTail(r.tail, LiteralPacket(version, r.value))
+    } else {
+      // Every other type of packet (any packet with a type ID other than 4) represent an operator
+      // that performs some calculation on one or more sub-packets contained within.
+      val (lengthTypeIdBits, lengthTypeIdTail) = typeIdTail.splitAt(1)
+      val lengthTypeId = bolts2Int(lengthTypeIdBits)
+      if (lengthTypeId == 0) {
+         // If the length type ID is 0, then the next 15 bits are a number that represents
+         // the total length in bits of the sub-packets contained by this packet.
+         val (subLengthBits, subLengthTail) = lengthTypeIdTail.splitAt(15)
+         val subLength = bolts2Int(subLengthBits)
+         val (subBits, subBitTail) = subLengthTail.splitAt(subLength)
+
+        // FIXME
+         val r = parse(subBits)
+        ResultTail(r.tail ::: subBitTail, r.value)
+
+      } else {
+        // If the length type ID is 1, then the next 11 bits are a number that represents
+        // the number of sub-packets immediately contained by this packet
+        val (subLengthBits, subLengthTail) = lengthTypeIdTail.splitAt(11)
+        val subLength = bolts2Int(subLengthBits)
+        ???
+      }
+    }
   }
 
   val bolts = in.flatMap(char2bolts)
@@ -86,24 +151,8 @@ object Day16 extends App {
   def part1(): Packet = {
 
     println(render(bolts))
-    var bs = bolts
-
-    val version = bolts2Int(bs.take(3))
-    bs = bs.drop(3)
-
-    val typeId = bolts2Int(bs.take(3))
-    bs = bs.drop(3)
-
-    if (typeId == 4) {
-      val r = bolts2Value(bs)
-      LiteralPacket(version, r.value)
-    } else {
-      val lengthTypeId = bolts2Int(bs.take(1))
-      bs = bs.drop(1)
-
-
-         ???
-    }
+    parse(bolts).value
   }
+
   println(part1())
 }
